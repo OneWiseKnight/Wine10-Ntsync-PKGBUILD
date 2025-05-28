@@ -1,0 +1,244 @@
+# Maintainer: loathingkernel <loathingkernel _a_ gmail _d_ com>
+# Contributor: Felix Yan <felixonmars@archlinux.org>
+# Contributor: Sven-Hendrik Haase <sh@lutzhaase.com>
+# Contributor: Jan "heftig" Steffens <jan.steffens@gmail.com>
+# Contributor: Eduardo Romero <eduardo@archlinux.org>
+# Contributor: Giovanni Scafora <giovanni@archlinux.org>
+
+pkgname=wine-cachyos
+_srctag=10.0-20250520
+pkgver=${_srctag//-/.}
+_geckover=2.47.4
+_monover=10.0.0
+_xaliaver=0.4.6
+pkgrel=4
+epoch=2
+
+_pkgbasever=${pkgver/rc/-rc}
+_winever=$_pkgbasever
+#_winever=${_pkgbasever%.*}
+
+source=(wine-cachyos::git+https://github.com/CachyOS/wine-cachyos.git#tag=cachyos-${_srctag}-base
+        https://dl.winehq.org/wine/wine-gecko/${_geckover}/wine-gecko-${_geckover}-x86{,_64}.tar.xz
+        https://github.com/madewokherd/wine-mono/releases/download/wine-mono-${_monover}/wine-mono-${_monover}-x86.tar.xz
+        https://github.com/madewokherd/xalia/releases/download/xalia-${_xaliaver}/xalia-${_xaliaver}-net48-mono.zip
+        0001-kernelbase-add-wow64-specific-workarounds.patch
+        0001-Revert-d3dx11_43-Fix-IMPORTLIB-directive.patch
+        30-win32-aliases.conf
+        wine-binfmt.conf)
+source+=(
+    _cachy.patch
+    _fixes.patch
+    _staging_ntsync.patch
+    _upstream_hacks.patch
+    _native.patch
+    _wine.patch
+)
+noextract=(
+    xalia-${_xaliaver}-net48-mono.zip
+)
+validpgpkeys=(5AC1A08B03BD7A313E0A955AF5E6E9EEB9461DD7
+              DA23579A74D4AD9AF9D3F945CEFAC8EAAF17519D)
+
+pkgdesc="A compatibility layer for running Windows programs, with extra CachyOS flavour"
+url="https://github.com/CachyOS/wine-cachyos"
+arch=(x86_64 x86_64_v3)
+options=(!staticlibs !lto !debug)
+license=(LGPL-2.1-or-later)
+depends=(
+  attr            #lib32-attr
+  desktop-file-utils
+  fontconfig      #lib32-fontconfig
+  freetype2       #lib32-freetype2
+  gcc-libs        #lib32-gcc-libs
+  gettext         #lib32-gettext
+  libpcap         #lib32-libpcap
+  libxcursor      #lib32-libxcursor
+  libxkbcommon    #lib32-libxkbcommon
+  libxi           #lib32-libxi
+  libxrandr       #lib32-libxrandr
+  wayland         #lib32-wayland
+)
+makedepends=(autoconf bison perl flex mingw-w64-gcc
+  git
+  alsa-lib              #lib32-alsa-lib
+  ffmpeg
+  giflib                #lib32-giflib
+  gnutls                #lib32-gnutls
+  gst-plugins-base-libs #lib32-gst-plugins-base-libs
+  gst-plugins-good      #lib32-gst-plugins-good
+  gtk3                  #lib32-gtk3
+  libcups               #lib32-libcups
+  libgphoto2
+  libpulse              #lib32-libpulse
+  libva                 #lib32-libva
+  libxcomposite         #lib32-libxcomposite
+  libxinerama           #lib32-libxinerama
+  libxxf86vm            #lib32-libxxf86vm
+  mesa                  #lib32-mesa
+  mesa-libgl            #lib32-mesa-libgl
+  opencl-headers
+  opencl-icd-loader     #lib32-opencl-icd-loader
+  python
+  samba
+  sane
+  sdl2                  #lib32-sdl2
+  unzip
+  v4l-utils             #lib32-v4l-utils
+  vulkan-icd-loader     #lib32-vulkan-icd-loader
+)
+optdepends=(
+  alsa-lib              #lib32-alsa-lib
+  alsa-plugins          #lib32-alsa-plugins
+  cups                  #lib32-libcups
+  dosbox
+  ffmpeg
+  giflib                #lib32-giflib
+  gnutls                #lib32-gnutls
+  gst-plugins-base-libs #lib32-gst-plugins-base-libs
+  gst-plugins-good      #lib32-gst-plugins-good
+  gtk3                  #lib32-gtk3
+  libgphoto2
+  libpulse              #lib32-libpulse
+  libva                 #lib32-libva
+  libxcomposite         #lib32-libxcomposite
+  libxinerama           #lib32-libxinerama
+  opencl-icd-loader     #lib32-opencl-icd-loader
+  samba
+  sane
+  sdl2                  #lib32-sdl2
+  v4l-utils             #lib32-v4l-utils
+  vulkan-icd-loader     #lib32-vulkan-icd-loader
+)
+
+provides=("wine=10.0" 'wine-mono' 'wine-gecko')
+conflicts=('wine' 'wine-mono' 'wine-gecko')
+install=wine.install
+
+
+prepare() {
+  # Get rid of old build dirs
+  rm -rf $pkgname-64-build
+  mkdir $pkgname-64-build
+
+  pushd $pkgname
+    patch -Np1 -i "$srcdir"/_upstream_hacks.patch
+    patch -Np1 -i "$srcdir"/_staging_ntsync.patch
+    patch -Np1 -i "$srcdir"/_fixes.patch
+    patch -Np1 -i "$srcdir"/_cachy.patch
+    patch -Np1 -i "$srcdir"/_native.patch
+    patch -Np1 -i "$srcdir"/_wine.patch
+    git config user.email "wine@cachyos.org"
+    git config user.name "wine cachyos"
+    git tag wine-10.0 --annotate -m "$pkgver" --force
+    patch -Np1 -i "$srcdir"/0001-kernelbase-add-wow64-specific-workarounds.patch
+    patch -Np1 -i "$srcdir"/0001-Revert-d3dx11_43-Fix-IMPORTLIB-directive.patch
+    ./tools/make_requests
+    ./tools/make_specfiles
+    ./dlls/winevulkan/make_vulkan -x vk.xml -X video.xml
+    autoreconf -fiv
+    rm -rf autom4te.cache
+  popd
+}
+
+build() {
+
+  local -a split=($CFLAGS)
+  local -A flags
+  for opt in "${split[@]}"; do flags["${opt%%=*}"]="${opt##*=}"; done
+  local march="${flags["-march"]:-nocona}"
+  local mtune="${flags["-mtune"]:-core-avx2}"
+
+  # From Proton
+  OPTIMIZE_FLAGS="-O2 -march=$march -mtune=$mtune -mfpmath=sse -pipe -fno-semantic-interposition"
+  SANITY_FLAGS="-fwrapv -fno-strict-aliasing"
+  DEBUG_FLAGS="-ffunction-sections -fdata-sections -fno-omit-frame-pointer"
+  WARNING_FLAGS="-Wno-incompatible-pointer-types"
+  STRIP_FLAGS="-s"
+  COMMON_FLAGS="$OPTIMIZE_FLAGS $SANITY_FLAGS $DEBUG_FLAGS $WARNING_FLAGS $STRIP_FLAGS"
+  #LTO_CFLAGS="-fuse-linker-plugin -fdevirtualize-at-ltrans -flto-partition=one -flto -Wl,-flto"
+
+  COMMON_LDFLAGS="-Wl,-O1,--sort-common,--as-needed"
+  #LTO_LDFLAGS="$LTO_CFLAGS"
+
+  # Disable assertions
+  #export CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -DNDEBUG -D_NDEBUG"
+
+  export LDFLAGS="$COMMON_LDFLAGS $LTO_LDFLAGS"
+  export CROSSLDFLAGS="$COMMON_LDFLAGS -Wl,--file-alignment,4096"
+
+  echo "Building Wine-64..."
+  export CFLAGS="$COMMON_FLAGS -mcmodel=small $LTO_CFLAGS"
+  export CXXFLAGS="$COMMON_FLAGS -mcmodel=small -std=c++17 $LTO_CFLAGS"
+  export CROSSCFLAGS="$COMMON_FLAGS"
+  export CROSSCXXFLAGS="$COMMON_FLAGS -std=c++17"
+  export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig"
+  cd "$srcdir/$pkgname-64-build"
+  ../$pkgname/configure \
+    --prefix=/usr \
+    --libdir=/usr/lib \
+    --with-x \
+    --with-wayland \
+    --with-gstreamer \
+    --with-mingw \
+    --with-alsa \
+    --without-ffmpeg \
+    --without-oss \
+    --disable-winemenubuilder \
+    --disable-tests \
+    --enable-archs=x86_64,i386
+
+  make
+}
+
+package() {
+  echo "Packaging Wine-64..."
+  cd "$srcdir/$pkgname-64-build"
+  make prefix="$pkgdir/usr" \
+    libdir="$pkgdir/usr/lib" \
+    dlldir="$pkgdir/usr/lib/wine" install-lib
+
+  # Font aliasing settings for Win32 applications
+  install -d "$pkgdir"/usr/share/fontconfig/conf.{avail,default}
+  install -m644 "$srcdir/30-win32-aliases.conf" "$pkgdir/usr/share/fontconfig/conf.avail"
+  ln -s ../conf.avail/30-win32-aliases.conf "$pkgdir/usr/share/fontconfig/conf.default/30-win32-aliases.conf"
+  install -Dm 644 "$srcdir/wine-binfmt.conf" "$pkgdir/usr/lib/binfmt.d/wine.conf"
+
+  i686-w64-mingw32-strip --strip-unneeded "$pkgdir"/usr/lib/wine/i386-windows/*.{dll,exe}
+  x86_64-w64-mingw32-strip --strip-unneeded "$pkgdir"/usr/lib/wine/x86_64-windows/*.{dll,exe}
+
+  #find "$pkgdir"/usr/lib/wine -iname "*.a" -delete
+  #find "$pkgdir"/usr/lib/wine -iname "*.def" -delete
+
+  # Install wine-gecko
+  cd "$srcdir"
+  install -d -m755 "$pkgdir"/usr/share/wine/gecko/
+  cp -dr --no-preserve='ownership' wine-gecko-${_geckover}-x86{,_64} "$pkgdir"/usr/share/wine/gecko/
+
+  # Install wine-mono
+  cd "$srcdir"
+  install -d -m755 "$pkgdir"/usr/share/wine/mono
+  cp -r -a --no-preserve='ownership' wine-mono-${_monover} "$pkgdir"/usr/share/wine/mono
+
+  # Install xalia
+  cd "$srcdir"
+  install -d -m755 "$pkgdir"/usr/share/xalia
+  unzip xalia-${_xaliaver}-net48-mono.zip -d "$pkgdir"/usr/share/xalia
+}
+
+# vim:set ts=8 sts=2 sw=2 et:
+b2sums=('SKIP'
+        '2a73c12585b502ae11188482cbc9fb1f45f95bfe4383a7615011104b132f4845f9813d01fb40277e1934fab5f1b35ab40b4f4a66a9967463dd1d666a666904e9'
+        '62856a88266b4757602c0646e024f832974a93f03b9df253fd4895d4f11a41b435840ad8f7003ec85a0d8087dec15f2e096dbfb4b01ebe4d365521e48fd0c5c0'
+        'a7efb7e9e3c03a92f3fc2c66172a2597ab4febfbf23a98c20d9ba46c48f0b96f568b21ea61f43cfa0cbbad2557cfafd665b63f3115611f0df9dd75ab358ecf43'
+        '4d30eea9306392790677a4e19f7e416a387aaf10c4a7681aa8fcd94faf07be81a984b28ba1437428d7c215c5ecdbba70993091547068fbdc224e809c3f7abd85'
+        '8e324daaa9bd55d0d37898242b9ea9d062e97b4a2273760b5d6094c35a256178c7ebe40c175444a65c98326848aeeaf1169250b54a02e53f17d493e0ffbb2c44'
+        '0d2d36f5e002a1921e89f1d2c6bb900b8e763642c428c8ef5113aeb721de1a31b131b9032027f58d24c54a4687573e51afbee8b2d9a90aeed4dadfe88695838f'
+        '45db34fb35a679dc191b4119603eba37b8008326bd4f7d6bd422fbbb2a74b675bdbc9f0cc6995ed0c564cf088b7ecd9fbe2d06d42ff8a4464828f3c4f188075b'
+        'e9de76a32493c601ab32bde28a2c8f8aded12978057159dd9bf35eefbf82f2389a4d5e30170218956101331cf3e7452ae82ad0db6aad623651b0cc2174a61588'
+        'SKIP'
+        'SKIP'
+        'SKIP'
+        'SKIP'
+        'SKIP'
+        'SKIP')
