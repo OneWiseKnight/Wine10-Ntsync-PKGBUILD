@@ -22,8 +22,7 @@ Subject: [PATCH 244/244] wine: Consolidate and clean up startup messaging.
 
 Subject: [PATCH 052/244] fonts: Add Liberation Serif as an Times New Roman
 Subject: [PATCH 051/244] fonts: Add Liberation Sans as an Arial replacement.
-
-+ Other font patches removed because I don't have a single clue at patching things and the normal patching method doesn't do fonts right??
+Other font patches removed because I don't have a single clue at patching things and the normal patching method doesn't do fonts right??
 
 ### Special Thanks
 - Cachyos Repo and [loathingKernel](https://github.com/loathingKernel) for their soul poured into the Cachy Wine/Proton Project
